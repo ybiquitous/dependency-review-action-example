@@ -75,11 +75,11 @@ jobs:
           {
             echo "${COMMENT_MARKER}"
             if [[ -n "${failed}" ]]; then
-              echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
+              echo '## :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
               echo
               cat "${table_file}"
             else
-              echo '### :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
+              echo '## :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
             fi
             echo
             echo "[Workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
