@@ -57,8 +57,10 @@ jobs:
           {
             echo '| Gem | Version | Advisory | Criticality | Title |'
             echo '| --- | --- | --- | --- | --- |'
-            jq -r '.results[] | select(.gem and .advisory) |
-              "| [\(.gem.name)](https://rubygems.org/gems/\(.gem.name)/versions/\(.gem.version)) | \(.gem.version) | [\(.advisory.id)](\(.advisory.url)) | \(.advisory.criticality // "unknown") | \(.advisory.title) |"' \
+            jq -r '
+              {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"} as $emoji |
+              .results[] | select(.gem and .advisory) |
+              "| [\(.gem.name)](https://rubygems.org/gems/\(.gem.name)/versions/\(.gem.version)) | \(.gem.version) | [\(.advisory.id)](\(.advisory.url)) | \($emoji[.advisory.criticality // "unknown"] // "⚪") \(.advisory.criticality // "unknown") | \(.advisory.title) |"' \
               "${json_file}"
           } > "${table_file}"
 
