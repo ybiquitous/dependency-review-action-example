@@ -27,6 +27,7 @@ jobs:
         with:
           comment-summary-in-pr: true
           fail-on-severity: low
+          warn-on-openssf-scorecard-level: 1
 
   bundler-audit:
     runs-on: ubuntu-slim
