@@ -75,11 +75,11 @@ jobs:
           {
             echo "${COMMENT_MARKER}"
             if [[ -n "${failed}" ]]; then
-              echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
+              echo '## :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
               echo
               cat "${table_file}"
             else
-              echo '### :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
+              echo '## :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
             fi
             echo
             echo "[Workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
@@ -100,10 +100,21 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body-includes: ${{ env.COMMENT_MARKER }}
 
-      - name: Comment on PR
-        id: comment-on-pr
+      - name: Check for Gemfile changes
+        if: github.event_name == 'pull_request'
+        id: gemfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if gh pr diff "${PR_NUMBER}" --name-only | grep -qE '^Gemfile(\.lock)?$'; then
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Post comment
         if: >-
           github.event_name == 'pull_request' &&
+          steps.gemfile.outputs.changed &&
           (steps.bundler-audit.outputs.failed || steps.find-comment.outputs.comment-id)
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
