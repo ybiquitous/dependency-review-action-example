@@ -45,18 +45,26 @@ jobs:
       - name: Run bundler-audit
         id: bundler-audit
         run: |
-          log_file="${RUNNER_TEMP}/bundler-audit.log"
+          json_file="${RUNNER_TEMP}/bundler-audit.json"
           set +e
-          bin/bundler-audit check --update --output "${log_file}"
+          bin/bundler-audit check --update --format json --output "${json_file}"
           exit_code="${PIPESTATUS[0]}"
           set -e
 
-          cat "${log_file}"
+          cat "${json_file}"
+
+          table_file="${RUNNER_TEMP}/bundler-audit-table.md"
+          {
+            echo '| Gem | Version | Advisory | Criticality | Title |'
+            echo '| --- | --- | --- | --- | --- |'
+            jq -r '.results[] | select(.gem and .advisory) |
+              "| \(.gem.name) | \(.gem.version) | [\(.advisory.id)](\(.advisory.url)) | \(.advisory.criticality // "unknown") | \(.advisory.title) |"' \
+              "${json_file}"
+          } > "${table_file}"
+
           {
             echo '## Bundler Audit'
-            echo '```'
-            cat "${log_file}"
-            echo '```'
+            cat "${table_file}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
           if [[ "${exit_code}" -ne 0 ]]; then
@@ -65,9 +73,9 @@ jobs:
 
           {
             echo "exit_code=${exit_code}"
-            echo 'log<<BUNDLER_AUDIT_LOG'
-            cat "${log_file}"
-            echo 'BUNDLER_AUDIT_LOG'
+            echo 'table<<BUNDLER_AUDIT_TABLE'
+            cat "${table_file}"
+            echo 'BUNDLER_AUDIT_TABLE'
           } >> "${GITHUB_OUTPUT}"
 
       - name: Comment on PR
@@ -80,6 +88,4 @@ jobs:
           body: |
             ### :warning: Bundler Audit found vulnerabilities
 
-            ```
-            ${{ steps.bundler-audit.outputs.log }}
-            ```
+            ${{ steps.bundler-audit.outputs.table }}
