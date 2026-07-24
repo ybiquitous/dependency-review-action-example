@@ -63,7 +63,7 @@ jobs:
           } > "${table_file}"
 
           {
-            echo '## Bundler Audit'
+            echo '## [bundler-audit](https://github.com/rubysec/bundler-audit)'
             cat "${table_file}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
@@ -86,6 +86,8 @@ jobs:
           comment-tag: bundler-audit
           edit-mode: replace
           body: |
-            ### :warning: Bundler Audit found vulnerabilities
+            ### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities
 
             ${{ steps.bundler-audit.outputs.table }}
+
+            [Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
