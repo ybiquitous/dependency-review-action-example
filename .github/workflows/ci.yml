@@ -76,9 +76,13 @@ jobs:
           comment_file="${RUNNER_TEMP}/bundler-audit-comment.md"
           {
             echo '<!-- bundler-audit -->'
-            echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
-            echo
-            cat "${table_file}"
+            if [[ "${exit_code}" -ne 0 ]]; then
+              echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
+              echo
+              cat "${table_file}"
+            else
+              echo '### :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
+            fi
             echo
             echo "[Workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
           } > "${comment_file}"
@@ -89,7 +93,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Find comment
-        if: github.event_name == 'pull_request' && steps.bundler-audit.outputs.exit_code != '0'
+        if: github.event_name == 'pull_request'
         id: find-comment
         uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
         with:
@@ -98,7 +102,9 @@ jobs:
           body-includes: '<!-- bundler-audit -->'
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request' && steps.bundler-audit.outputs.exit_code != '0'
+        if: >-
+          github.event_name == 'pull_request' &&
+          (steps.bundler-audit.outputs.exit_code != '0' || steps.find-comment.outputs.comment-id != '')
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
