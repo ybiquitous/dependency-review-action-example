@@ -33,6 +33,8 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       pull-requests: write
+    env:
+      COMMENT_MARKER: "<!-- bundler-audit -->"
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,6 +53,11 @@ jobs:
           exit_code="${PIPESTATUS[0]}"
           set -e
 
+          failed=''
+          if [[ "${exit_code}" -ne 0 ]]; then
+            failed='true'
+          fi
+
           cat "${json_file}"
 
           table_file="${RUNNER_TEMP}/bundler-audit-table.md"
@@ -64,19 +71,10 @@ jobs:
               "${json_file}"
           } > "${table_file}"
 
-          {
-            echo '## [bundler-audit](https://github.com/rubysec/bundler-audit)'
-            cat "${table_file}"
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-          if [[ "${exit_code}" -ne 0 ]]; then
-            echo "::warning::bundler-audit found vulnerabilities, see the job summary for details"
-          fi
-
           comment_file="${RUNNER_TEMP}/bundler-audit-comment.md"
           {
-            echo '<!-- bundler-audit -->'
-            if [[ "${exit_code}" -ne 0 ]]; then
+            echo "${COMMENT_MARKER}"
+            if [[ -n "${failed}" ]]; then
               echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
               echo
               cat "${table_file}"
@@ -88,7 +86,7 @@ jobs:
           } > "${comment_file}"
 
           {
-            echo "exit_code=${exit_code}"
+            echo "failed=${failed}"
             echo "comment_file=${comment_file}"
           } >> "${GITHUB_OUTPUT}"
 
@@ -98,16 +96,21 @@ jobs:
         uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: '<!-- bundler-audit -->'
+          body-includes: ${{ env.COMMENT_MARKER }}
 
       - name: Comment on PR
+        id: comment-on-pr
         if: >-
           github.event_name == 'pull_request' &&
-          (steps.bundler-audit.outputs.exit_code != '0' || steps.find-comment.outputs.comment-id != '')
+          (steps.bundler-audit.outputs.failed || steps.find-comment.outputs.comment-id)
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
           body-file: ${{ steps.bundler-audit.outputs.comment_file }}
+
+      - name: Add job summary
+        if: steps.comment-on-pr.outputs.comment-id
+        run: |
+          echo "See [bundler-audit PR comment](${{ github.event.pull_request.html_url }}#issuecomment-${{ steps.comment-on-pr.outputs.comment-id }})" >> "${GITHUB_STEP_SUMMARY}"
