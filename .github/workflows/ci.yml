@@ -55,12 +55,12 @@ jobs:
 
           table_file="${RUNNER_TEMP}/bundler-audit-table.md"
           {
-            echo '| Gem | Version | Advisory | Criticality | Title |'
-            echo '| --- | --- | --- | --- | --- |'
+            echo '| Gem | Version | Advisory | Criticality | Title | Patched |'
+            echo '| --- | --- | --- | --- | --- | --- |'
             jq -r '
               {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"} as $emoji |
               .results[] | select(.gem and .advisory) |
-              "| [\(.gem.name)](https://rubygems.org/gems/\(.gem.name)/versions/\(.gem.version)) | \(.gem.version) | [\(.advisory.id)](\(.advisory.url)) | \($emoji[.advisory.criticality // "unknown"] // "⚪") \(.advisory.criticality // "unknown") | \(.advisory.title) |"' \
+              "| [\(.gem.name)](https://rubygems.org/gems/\(.gem.name)/versions/\(.gem.version)) | \(.gem.version) | \(.advisory.id) | \($emoji[.advisory.criticality // "unknown"] // "⚪") \(.advisory.criticality // "unknown") | \(.advisory.title) | \(.advisory.patched_versions // [] | join(", ")) |"' \
               "${json_file}"
           } > "${table_file}"
 
