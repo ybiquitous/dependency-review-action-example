@@ -42,6 +42,7 @@ jobs:
           exit_code="${PIPESTATUS[0]}"
           set -e
 
+          cat "${log_file}"
           {
             echo '## Bundler Audit'
             echo '```'
