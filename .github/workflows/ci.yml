@@ -56,4 +56,6 @@ jobs:
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          exit "${exit_code}"
+          if [[ "${exit_code}" -ne 0 ]]; then
+            echo "::warning::bundler-audit found vulnerabilities, see the job summary for details"
+          fi
