@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   dependency-review:
     if: github.event_name == 'pull_request'
@@ -31,4 +35,18 @@ jobs:
           bundler-cache: true
 
       - name: Run bundler-audit
-        run: bin/bundler-audit check --update
+        run: |
+          log_file="${RUNNER_TEMP}/bundler-audit.log"
+          set +e
+          bin/bundler-audit check --update --output "${log_file}"
+          exit_code="${PIPESTATUS[0]}"
+          set -e
+
+          {
+            echo '## Bundler Audit'
+            echo '```'
+            cat "${log_file}"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          exit "${exit_code}"
