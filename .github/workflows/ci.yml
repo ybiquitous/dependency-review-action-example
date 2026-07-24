@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-slim
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          comment-summary-in-pr: true
+          fail-on-severity: low
+          warn-on-openssf-scorecard-level: 7
+
+  bundler-audit:
+    runs-on: ubuntu-slim
+    permissions:
+      pull-requests: write
+    env:
+      COMMENT_MARKER: "<!-- bundler-audit -->"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          bundler-cache: true
+
+      - name: Run bundler-audit
+        id: bundler-audit
+        run: |
+          json_file="${RUNNER_TEMP}/bundler-audit.json"
+          set +e
+          bin/bundler-audit check --update --format json --output "${json_file}"
+          exit_code="${PIPESTATUS[0]}"
+          set -e
+
+          failed=''
+          if [[ "${exit_code}" -ne 0 ]]; then
+            failed='true'
+          fi
+
+          cat "${json_file}"
+
+          table_file="${RUNNER_TEMP}/bundler-audit-table.md"
+          {
+            echo '| Gem | Version | Advisory | Criticality | Title | Patched |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '
+              {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"} as $emoji |
+              .results[] | select(.gem and .advisory) |
+              "| [\(.gem.name)](https://rubygems.org/gems/\(.gem.name)/versions/\(.gem.version)) | \(.gem.version) | \(.advisory.id) | \($emoji[.advisory.criticality // "unknown"] // "⚪") \(.advisory.criticality // "unknown") | \(.advisory.title) | \(.advisory.patched_versions // [] | join(", ")) |"' \
+              "${json_file}"
+          } > "${table_file}"
+
+          comment_file="${RUNNER_TEMP}/bundler-audit-comment.md"
+          {
+            echo "${COMMENT_MARKER}"
+            if [[ -n "${failed}" ]]; then
+              echo '### :warning: [bundler-audit](https://github.com/rubysec/bundler-audit) found vulnerabilities'
+              echo
+              cat "${table_file}"
+            else
+              echo '### :white_check_mark: [bundler-audit](https://github.com/rubysec/bundler-audit) found no vulnerabilities'
+            fi
+            echo
+            echo "[Workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+          } > "${comment_file}"
+
+          cat "${comment_file}" >> "${GITHUB_STEP_SUMMARY}"
+
+          {
+            echo "failed=${failed}"
+            echo "comment_file=${comment_file}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Find comment
+        if: github.event_name == 'pull_request'
+        id: find-comment
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: ${{ env.COMMENT_MARKER }}
+
+      - name: Comment on PR
+        id: comment-on-pr
+        if: >-
+          github.event_name == 'pull_request' &&
+          (steps.bundler-audit.outputs.failed || steps.find-comment.outputs.comment-id)
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body-file: ${{ steps.bundler-audit.outputs.comment_file }}
