@@ -85,6 +85,8 @@ jobs:
             echo "[Workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
           } > "${comment_file}"
 
+          cat "${comment_file}" >> "${GITHUB_STEP_SUMMARY}"
+
           {
             echo "failed=${failed}"
             echo "comment_file=${comment_file}"
@@ -109,8 +111,3 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
           body-file: ${{ steps.bundler-audit.outputs.comment_file }}
-
-      - name: Add job summary
-        if: steps.comment-on-pr.outputs.comment-id
-        run: |
-          echo "See [bundler-audit PR comment](${{ github.event.pull_request.html_url }}#issuecomment-${{ steps.comment-on-pr.outputs.comment-id }})" >> "${GITHUB_STEP_SUMMARY}"
