@@ -2,7 +2,7 @@
 
 source "https://rubygems.org"
 
-gem "oauth", "= 1.1.1"
+gem "oauth", "1.1.6"
 
 gem "bundler-audit", "~> 0.9.3"
 
